@@ -1,60 +1,83 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>YouTube Downloader</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
-<body>
-  <div class="container">
-    <h2>YouTube Downloader</h2>
-    <form id="downloadForm">
-      <input type="text" name="url" placeholder="Enter YouTube URL" required>
-      <select name="quality" required>
-        <option value="360">360p</option>
-        <option value="480">480p</option>
-        <option value="720">720p</option>
-        <option value="1080">1080p</option>
-      </select>
-      <button type="submit">Download</button>
-    </form>
-    <div id="progress-bar"><div id="progress-fill">0%</div></div>
-    <p id="status"></p>
-  </div>
+  <head>
+    <meta charset="UTF-8" />
+    <title>YouTube Downloader</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='style.css') }}"
+    />
+  </head>
+  <body>
+    <div class="container">
+      <h2>YouTube Downloader</h2>
+      <form id="downloadForm">
+        <input
+          type="text"
+          id="url"
+          name="url"
+          placeholder="Enter YouTube URL"
+          required
+        />
+        <select id="quality" name="quality" required>
+          <option value="360">360p</option>
+          <option value="480" selected>480p</option>
+          <option value="720">720p</option>
+          <option value="1080">1080p</option>
+        </select>
+        <button type="submit">Download</button>
+      </form>
 
-  <script>
-    const form = document.getElementById("downloadForm");
-    const progressFill = document.getElementById("progress-fill");
-    const statusText = document.getElementById("status");
+      <div id="progress-bar">
+        <div id="progress-fill">0%</div>
+      </div>
+      <p id="status"></p>
+    </div>
 
-    form.addEventListener("submit", function(e) {
-      e.preventDefault();
-      const formData = new FormData(form);
+    <script>
+      const form = document.getElementById("downloadForm");
+      const progressFill = document.getElementById("progress-fill");
+      const statusText = document.getElementById("status");
 
-      fetch("/download", {
-        method: "POST",
-        body: formData
-      }).then(res => res.json()).then(data => {
-        if (data.status === "started") {
-          statusText.textContent = "Download started...";
-          listenProgress();
-        }
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+
+        const url = document.getElementById("url").value;
+        const quality = document.getElementById("quality").value;
+
+        fetch("/download", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url, quality }),
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.status === "success" || data.status === "started") {
+              statusText.textContent = "Download started...";
+              listenProgress();
+            } else if (data.error) {
+              statusText.textContent = "Error: " + data.error;
+            }
+          })
+          .catch((err) => {
+            statusText.textContent = "Request failed: " + err.message;
+          });
       });
-    });
 
-    function listenProgress() {
-      const evtSource = new EventSource("/progress");
-      evtSource.onmessage = function(event) {
-        const data = JSON.parse(event.data.replace(/'/g, '"'));
-        progressFill.style.width = data.progress;
-        progressFill.textContent = data.progress;
-        statusText.textContent = data.message;
+      function listenProgress() {
+        const evtSource = new EventSource("/progress");
 
-        if (data.status === "finished") {
-          evtSource.close();
-        }
+        evtSource.onmessage = function (event) {
+          const data = JSON.parse(event.data);
+          progressFill.style.width = data.progress;
+          progressFill.textContent = data.progress;
+          statusText.textContent = data.message;
+
+          if (data.status === "finished" || data.status === "exists") {
+            evtSource.close();
+          }
+        };
       }
-    }
-  </script>
-</body>
+    </script>
+  </body>
 </html>
