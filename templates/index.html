@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>YouTube Downloader</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="container">
+    <h2>YouTube Downloader</h2>
+    <form id="downloadForm">
+      <input type="text" name="url" placeholder="Enter YouTube URL" required>
+      <select name="quality" required>
+        <option value="360">360p</option>
+        <option value="480">480p</option>
+        <option value="720">720p</option>
+        <option value="1080">1080p</option>
+      </select>
+      <button type="submit">Download</button>
+    </form>
+    <div id="progress-bar"><div id="progress-fill">0%</div></div>
+    <p id="status"></p>
+  </div>
+
+  <script>
+    const form = document.getElementById("downloadForm");
+    const progressFill = document.getElementById("progress-fill");
+    const statusText = document.getElementById("status");
+
+    form.addEventListener("submit", function(e) {
+      e.preventDefault();
+      const formData = new FormData(form);
+
+      fetch("/download", {
+        method: "POST",
+        body: formData
+      }).then(res => res.json()).then(data => {
+        if (data.status === "started") {
+          statusText.textContent = "Download started...";
+          listenProgress();
+        }
+      });
+    });
+
+    function listenProgress() {
+      const evtSource = new EventSource("/progress");
+      evtSource.onmessage = function(event) {
+        const data = JSON.parse(event.data.replace(/'/g, '"'));
+        progressFill.style.width = data.progress;
+        progressFill.textContent = data.progress;
+        statusText.textContent = data.message;
+
+        if (data.status === "finished") {
+          evtSource.close();
+        }
+      }
+    }
+  </script>
+</body>
+</html>
